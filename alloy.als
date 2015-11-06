@@ -20,7 +20,8 @@ sig Delayed_call extends Call{
 	}
 
 sig Immediate_call extends Call{
-	caller:one User
+	caller:one User,
+	start: one Address
 	}
 
 sig Shared_call extends Call{
@@ -45,17 +46,13 @@ sig Address{
 
 fact OneDriverPerCall{
 	//ad ogni call deve corrispondere un tassista se attiva oppure essere un past call di un utente
-	all c:Call | ((one t:Taxi_driver | t.incoming=c )<=> !(some u:User | c in  u.past_call))
+	all c:Call | (lone t:Taxi_driver | t.incoming=c )
+	all c:Call| (some u:User |(no t:Taxi_driver | c=t.incoming <=> (c in u.past_call)))
 }
 
 fact BlankCalls {
 	//le chiamate perse non possono essere più di quelle effettuate e devono essere contenute in quelle passate
 	all u:User|(all c: Call |(c in u.blank_call implies c in u.past_call))}
-
-fact AllPastShared {
-	//se una corsa condivisa è passata per un utente deve essere passata per tutti gli utenti della corsa
-	all c:Shared_call, u,u1:User | ((u!=u1) implies (c in u.past_call implies (c in u1.past_call)))
-}	
 
 fact MaxOneActiveCall {
 	//un utente può avere solo una chiamata attiva
@@ -71,11 +68,12 @@ fact DestinationNotStart {
 
 fact NotEmptyQueue{
 	//in ogni coda deve contenere almeno un tassista
-	all q:Queue | (some t:Taxi_driver | t in q.drivers)}
+	all q:Queue | (some t:Taxi_driver | t in q.drivers)
+}
 
 fact NumberAdressesShared{
 	//partenze e arrivi al massimo uguali al numero di utenti
- all c:Shared_call | (#c.start <=#c.caller && #c.destination<=#c.caller)}
+	 all c:Shared_call | (#c.start <=#c.caller && #c.destination<=#c.caller)}
 
 fact SameStartZone{
 	//tutti gli utenti devono partire dalla stessa zona
@@ -96,7 +94,8 @@ fact OnlyMyCalls {
 	}	
 fact OneQueuePerTaxi{
 	//un tassista deve essere in una sola coda
-	all t:Taxi_driver |(all q:Queue, n:Queue |( q!=n implies ( t in q.drivers => t not in n.drivers)))}
+	all t:Taxi_driver |(lone q:Queue |t in q.drivers)
+}
 
 fact LocationInUser{
 	//una location di una chiamata deve essere nelle location dell'utente
@@ -105,7 +104,6 @@ fact LocationInUser{
 fact NoOrphanAddress{
 	//non ci sono indirizzi senza zona
 	all a:Address| (one z:Zone |(a in z.address))}
-
 
 //ASSERTIONS
 
@@ -117,7 +115,7 @@ assert NoOrphanCalls {
 
 assert NoDifferentStart {
 	//controlla che non ci siano utenti che partono da zone diverse
-//	all c : Shared_call |(no a: Address, b:Address |( a in c.start && b in c.start && a.zone!=b.zone))
+	//all c : Shared_call |(no a: Address, b:Address |( a in c.start && b in c.start && a.zone!=b.zone))
 }
 //check NoDifferentStart
 
@@ -126,12 +124,13 @@ assert MaxBlank {
  	all u:User | (#u.blank_call<=#u.past_call)}
 //check MaxBlank
 
+
+
 //PREDICATES
 
 //un mondo senza utenti
 pred ShowOnlyTaxi {
-some Shared_call
-#Zone>2
-	
+//some t:Taxi_driver| (all q: Queue | t not in q.drivers)
+some s:Shared_call | #s.caller>1	
  }
 run ShowOnlyTaxi 
