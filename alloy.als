@@ -83,7 +83,6 @@ fact SameStartZone{
 fact QueueInZone {
 	//ogni zona deve avere una e una sola queue
 	all z:Zone |(one q:Queue |q.zone=z)
-//	all z:Zone |(all q:Queue, n:Queue |( q!=n implies ((z in q.zone or z in n.zone) and !(z in q.zone and z in n.zone))))
 }
 
 fact OnlyMyCalls {
@@ -92,6 +91,7 @@ fact OnlyMyCalls {
 	all u:User |(all c:Delayed_call|(c in u.past_call implies c.caller=u))
 	all u:User |(all c:Shared_call | (c in u.past_call implies u in c.caller))
 	}	
+
 fact OneQueuePerTaxi{
 	//un tassista deve essere in una sola coda
 	all t:Taxi_driver |(lone q:Queue |t in q.drivers)
@@ -99,11 +99,12 @@ fact OneQueuePerTaxi{
 
 fact LocationInUser{
 	//una location di una chiamata deve essere nelle location dell'utente
-	all l:Location, u:User | (l in u.location)}
+	all l:Location|(one u:User | (l in u.location))}
 
 fact NoOrphanAddress{
 	//non ci sono indirizzi senza zona
 	all a:Address| (one z:Zone |(a in z.address))}
+
 
 //ASSERTIONS
 
@@ -111,26 +112,61 @@ assert NoOrphanCalls {
 	//controlla che non ci siano chiamate senza tassista o utente
 	no c: Call | ((no u: User | c in u.past_call) && (no t: Taxi_driver | t.incoming=c))  
 }
-//check NoOrphanCalls
+check NoOrphanCalls
 
 assert NoDifferentStart {
 	//controlla che non ci siano utenti che partono da zone diverse
-	//all c : Shared_call |(no a: Address, b:Address |( a in c.start && b in c.start && a.zone!=b.zone))
+	all c : Shared_call, a1,a2 : Address |(a1 in c.start and a2 in c.start implies (one z:Zone| a1 in z.address and a2 in z.address)) 
 }
-//check NoDifferentStart
+check NoDifferentStart
 
 assert MaxBlank {
 	//controlla che le chiamate perse non siano maggiori di quelle effettuate
  	all u:User | (#u.blank_call<=#u.past_call)}
-//check MaxBlank
+check MaxBlank
 
 
 
 //PREDICATES
 
-//un mondo senza utenti
-pred ShowOnlyTaxi {
-//some t:Taxi_driver| (all q: Queue | t not in q.drivers)
-some s:Shared_call | #s.caller>1	
+//un mondo con tassisti non in coda
+pred DriverNotinQUeue {
+some t:Taxi_driver| (all q: Queue | t not in q.drivers)
+some Location
+some Immediate_call
  }
-run ShowOnlyTaxi 
+run DriverNotinQUeue 
+
+
+//un mondo con utenti che chiamano ma non prendolo il taxi
+pred UserNoRide{
+all c:Call|(some u:User | c in u.blank_call)
+}
+run UserNoRide
+
+//un mondo con almeno 2 utenti che chiamano un taxi condiviso
+pred Sharing{
+some c:Shared_call | #c.caller>1 and (no u:User | c in u.past_call)
+}
+
+run Sharing
+
+//un mondo in cui un utente ha prenotato una chiamata da una zona preferita ad un'altra
+pred Favorite {
+one u:User| (some c:Delayed_call |( c.start in u.location.address and c.destination in u.location.address and c not in u.past_call))
+}
+
+run Favorite
+
+//un mondo con 2 zone
+pred TwoZones{
+#Person>2
+#Zone>1
+}
+run TwoZones
+
+//partenza e arrivo in zone diverse
+pred DifferentZone{
+one c:Delayed_call | some z1,z2:Zone | (c.start in z1.address and c.destination in z2.address and z1!=z2)
+}
+run DifferentZone
