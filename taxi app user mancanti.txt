@@ -1,0 +1,4 @@
+Mancano: 
+-settings e account settings (almeno una delle due)
+-locations
+-past calls (listate, con le opzioni add, delete, modify)
