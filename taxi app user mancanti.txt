@@ -2,3 +2,4 @@ Mancano:
 -settings e account settings (almeno una delle due)
 -locations
 -past calls (listate, con le opzioni add, delete, modify)
+-finestra per inserire l'indirizzo (visto che si usa sia per una nuova location che per una call in un nuovo indirizzo)
