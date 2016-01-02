@@ -1,0 +1,178 @@
+    public void commit() throws RollbackException,/*!!!Naming Conventions errore 5!!!*/
+                HeuristicMixedException, HeuristicRollbackException,/*!!!Naming Conventions errore 5!!!*/
+                SecurityException, IllegalStateException, SystemException { /*!!!Class and Interface Declarations errore 27 (metodo molto lungo, potrebbe essere diviso?)!!!*/
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+        checkTransationActive();
+
+        // START local transaction timeout
+        // If this transaction is set for timeout, cancel it as it is in the commit state
+        if (isTimerTask) /*!!!braces errore 11!!!*/
+            cancelTimerTask();
+
+        // END local transaction timeout
+        if (_logger.isLoggable(Level.FINE)) {
+            _logger.log(Level.FINE,"--In JavaEETransactionImpl.commit, jtsTx="+jtsTx
+                +" nonXAResource="+ nonXAResource);
+        }
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+        commitStarted = true;
+        boolean success = false; /*!!!Initialization and Declarations errore 33 (dichiarazione non all'inizio di un blocco)!!!*/
+        if ( jtsTx != null ) {/*!!!Comments errore 18 (commenti mancanti)!!!*/
+            try {
+                jtsTx.commit();
+                success = true;
+            } catch(HeuristicMixedException e) {
+                success = true;
+                throw e;
+            } finally {
+                ((JavaEETransactionManagerSimplified) javaEETM).monitorTxCompleted(this, success);
+                ((JavaEETransactionManagerSimplified) javaEETM).clearThreadTx();
+                onTxCompletion(success);
+                try {
+                    localTxStatus = jtsTx.getStatus();
+                } catch (Exception e) {
+                    localTxStatus = Status.STATUS_NO_TRANSACTION;
+                }
+                jtsTx = null;
+            }
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+        } else { // local tx
+            Exception caughtException = null;
+            try {
+                if ( timedOut ) {
+                    // rollback nonXA resource
+                    if ( nonXAResource != null ) /*!!!braces errore 11!!!*/
+                        nonXAResource.getXAResource().rollback(xid);/*!!!Naming Conventions errore 5!!!*/
+                    localTxStatus = Status.STATUS_ROLLEDBACK;
+                    throw new RollbackException(sm.getString("enterprise_distributedtx.rollback_timeout"));/*!!!Naming Conventions errore 5!!!*/
+                }
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                if ( isRollbackOnly() ) {/*!!!Naming Conventions errore 5!!!*/
+                    // rollback nonXA resource
+                    if ( nonXAResource != null ) /*!!!braces errore 11!!!*/
+                        nonXAResource.getXAResource().rollback(xid);/*!!!Naming Conventions errore 5!!!*/
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                    localTxStatus = Status.STATUS_ROLLEDBACK;
+                    throw new RollbackException(sm.getString("enterprise_distributedtx.mark_rollback"));/*!!!Naming Conventions errore 5!!!*/
+                }
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                // call beforeCompletion
+                for ( int i=0; i<syncs.size(); i++ ) {
+                    try {
+                        Synchronization sync = (Synchronization)syncs.elementAt(i);
+                        sync.beforeCompletion();
+                    } catch ( RuntimeException ex ) { 
+                        _logger.log(Level.WARNING, "enterprise_distributedtx.before_completion_excep", ex);
+                        setRollbackOnly();/*!!!Naming Conventions errore 5!!!*/
+                        caughtException = ex;
+                        break;
+                    } catch (Exception ex) { 
+                        _logger.log(Level.WARNING, "enterprise_distributedtx.before_completion_excep", ex);
+                        // XXX-V2 no setRollbackOnly() ??? /*!!!Comments errore 18 e 19 (codice commentato, commento non chiaro)!!!*/
+                    } 
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                }
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                for ( int i=0; i<interposedSyncs.size(); i++ ) {
+                    try {
+                        Synchronization sync = (Synchronization)interposedSyncs.elementAt(i);
+                        sync.beforeCompletion();
+                    } catch ( RuntimeException ex ) {
+                        _logger.log(Level.WARNING, "enterprise_distributedtx.before_completion_excep", ex);
+                        setRollbackOnly();  /*!!!Naming Conventions errore 5!!!*/
+                        caughtException = ex;
+                        break;
+                    } catch (Exception ex) { 
+                        _logger.log(Level.WARNING, "enterprise_distributedtx.before_completion_excep", ex);
+                        // XXX-V2 no setRollbackOnly() ??? /*!!!Comments errore 18 e 19 (codice commentato, commento non chiaro)!!!*/
+                    }
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                }/*!!!INIZIO PARTE DI CATY!!!*/
+
+                // check rollbackonly again, in case any of the beforeCompletion
+                // calls marked it for rollback.
+                if ( isRollbackOnly()) { /*!!!Naming Conventions errore 5!!!*/
+                    //Check if it is a Local Transaction
+                    RollbackException rbe = null; /*!!!Naming Conventions errore 5!!!*/
+                    if(jtsTx == null) { /*!!!Object Comparison errore 40!!!*/
+                        if ( nonXAResource != null ) /*!!!braces errore 11!!!*/
+                            nonXAResource.getXAResource().rollback(xid); /*!!!Naming Conventions errore 5!!!*/
+                        localTxStatus = Status.STATUS_ROLLEDBACK;
+                        rbe = new RollbackException(sm.getString("enterprise_distributedtx.mark_rollback")); /*!!!Naming Conventions errore 5!!!*/
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                    // else it is a global transaction
+                    } else {
+                        jtsTx.rollback(); /*!!!Naming Conventions errore 5!!!*/
+                        localTxStatus = Status.STATUS_ROLLEDBACK;
+                        rbe = new RollbackException(sm.getString("enterprise_distributedtx.mark_rollback"));/*!!!Naming Conventions errore 5!!!*/
+                    }
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                    // RollbackException doesn't have a constructor that takes a Throwable.
+                    if (caughtException != null) {
+                        rbe.initCause(caughtException);
+                    }
+                    throw rbe;
+                }
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                // check if there is a jtsTx active, in case any of the
+                // beforeCompletions registered the first XA resource.
+                if ( jtsTx != null ) {
+                    jtsTx.commit();
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                    // Note: JTS will not call afterCompletions in this case,
+                    // because no syncs have been registered with JTS.
+                    // So afterCompletions are called in finally block below.
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                } else {
+                    // do single-phase commit on nonXA resource
+                    if ( nonXAResource != null ) /*!!!braces errore 11!!!*/
+                        nonXAResource.getXAResource().commit(xid, true);
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                }
+                // V2-XXX should this be STATUS_NO_TRANSACTION ? /*!!!Comments errore 19 commento non rimosso!!!*/
+                localTxStatus = Status.STATUS_COMMITTED;
+                success = true;
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+            } catch ( RollbackException ex ) {/*!!!Naming Conventions errore 5!!!*/
+                localTxStatus = Status.STATUS_ROLLEDBACK; // V2-XXX is this correct ? /*!!!Comments errore 19 commento non rimosso!!!*/
+                throw ex;
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+            } catch ( SystemException ex ) {
+                // localTxStatus = Status.STATUS_ROLLEDBACK; // V2-XXX is this correct ? /*!!!Comments errore 19 commento non rimosso!!!*/
+                localTxStatus = Status.STATUS_COMMITTING;
+                success = true;
+                throw ex;
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+            } catch ( Exception ex ) {
+                localTxStatus = Status.STATUS_ROLLEDBACK; // V2-XXX is this correct ? /*!!!Comments errore 19 commento non rimosso!!!*/
+                SystemException exc = new SystemException(); /*!!!Initialization and Declarations errore 33 (dichiarazione non all'inizio di un blocco)!!!*/
+                exc.initCause(ex);
+                throw exc;
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+            } finally {/*!!!Comments errore 18 (commenti mancanti)!!!*/
+                ((JavaEETransactionManagerSimplified) javaEETM).monitorTxCompleted(this, success);
+                ((JavaEETransactionManagerSimplified) javaEETM).clearThreadTx();
+                for ( int i=0; i<interposedSyncs.size(); i++ ) {
+                    try { 
+                        Synchronization sync = (Synchronization)interposedSyncs.elementAt(i);
+                        sync.afterCompletion(localTxStatus);
+                    } catch ( Exception ex ) {
+                        _logger.log(Level.WARNING, "enterprise_distributedtx.after_completion_excep", ex);
+                    }
+                }
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                // call afterCompletions
+                for ( int i=0; i<syncs.size(); i++ ) {
+                    try {
+                        Synchronization sync = (Synchronization)syncs.elementAt(i);
+                        sync.afterCompletion(localTxStatus);
+                    } catch ( Exception ex ) {
+                        _logger.log(Level.WARNING, "enterprise_distributedtx.after_completion_excep", ex);
+                    }
+                }
+/*!!!File Organization errore 12 (spazio non necessario)!!!*/
+                onTxCompletion(success);
+                jtsTx = null;
+            }
+        }
+    }

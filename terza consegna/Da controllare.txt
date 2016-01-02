@@ -1,0 +1,3 @@
+Indention
+8. Three or four spaces are used for indentation and done so consistently
+9. No tabs are used to indent

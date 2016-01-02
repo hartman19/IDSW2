@@ -1,0 +1,36 @@
+public String toString(){
+
+    // If we have a cached copy of the string form of the global identifier, return
+    // it now.
+    if( stringForm != null ) return stringForm;
+
+    // Otherwise format the global identifier.
+    //char[] buff = new char[gtrId.length*2 + 2/*'[' and ']'*/ + 3/*bqual and ':'*/];
+    char[] buff = new char[gtrId.length*2 + 3/*bqual and ':'*/];
+    int pos = 0;
+    //buff[pos++] = '[';
+
+    // Convert the global transaction identifier into a string of hex digits.
+
+    int globalLen = gtrId.length ;
+    for( int i = 0; i < globalLen; i++ ) {
+        int currCharHigh = (gtrId[i]&0xf0) >> 4;
+        int currCharLow  = gtrId[i]&0x0f;
+        buff[pos++] = (char)(currCharHigh + (currCharHigh > 9 ? 'A'-10 : '0'));
+        buff[pos++] = (char)(currCharLow  + (currCharLow  > 9 ? 'A'-10 : '0'));
+    }
+
+    //buff[pos++] = ':';
+    buff[pos++] = '_';
+    int currCharHigh = (0&0xf0) >> 4;
+    int currCharLow  = 0&0x0f;
+    buff[pos++] = (char)(currCharHigh + (currCharHigh > 9 ? 'A'-10 : '0'));
+    buff[pos++] = (char)(currCharLow  + (currCharLow  > 9 ? 'A'-10 : '0'));
+    //buff[pos] = ']';
+
+    // Cache the string form of the global identifier.
+    stringForm = new String(buff);
+
+    return stringForm;
+}
+// END IASRI 4662745
