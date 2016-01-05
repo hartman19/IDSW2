@@ -1,27 +1,27 @@
-    public void rollback() throws IllegalStateException, SystemException {
+    public void rollback() throws IllegalStateException, SystemException {    // ERROR 5 
 
         // START local transaction timeout
         // If this transaction is set for timeout, cancel it as it is in the rollback state
-        if (isTimerTask)
+        if (isTimerTask) //ERROR 10
             cancelTimerTask();
         // END local transaction timeout
 
-        if (_logger.isLoggable(Level.FINE)) {
+        if (_logger.isLoggable(Level.FINE)) { //ERROR 10
             _logger.log(Level.FINE,"--In JavaEETransactionImpl.rollback, jtsTx="+jtsTx
-                    +" nonXAResource="+nonXAResource);
-        }
+                    +" nonXAResource="+nonXAResource); //ERROR 15
+        } //MISSING COMMENT 18
 
-        if ( jtsTx == null )
-            checkTransationActive(); // non-xa transaction can't be in prepared state, xa code will do its check
+        if ( jtsTx == null ) //ERROR 10, ERROR 
+            checkTransationActive(); // non-xa transaction can't be in prepared state, xa code will do its check  // ERROR 13
 
         try {
-            if ( jtsTx != null )
+            if ( jtsTx != null ) //ERROR 10
                 jtsTx.rollback();
 
             else { // rollback nonXA resource
-                if ( nonXAResource != null )
+                if ( nonXAResource != null )//ERROR 10
                     nonXAResource.getXAResource().rollback(xid);
-
+//ERROR 12
             }
 
         } catch ( SystemException ex ) {
@@ -31,13 +31,13 @@
         } catch ( Exception ex ) {
             _logger.log(Level.WARNING, "enterprise_distributedtx.some_excep", ex);
         } finally {
-            // V2-XXX should this be STATUS_NO_TRANSACTION ?
+            // V2-XXX should this be STATUS_NO_TRANSACTION ?  //ERROR 19
             localTxStatus = Status.STATUS_ROLLEDBACK;
 
             ((JavaEETransactionManagerSimplified) javaEETM).monitorTxCompleted(this, false);
             ((JavaEETransactionManagerSimplified) javaEETM).clearThreadTx();
-            if ( jtsTx == null ) {
-                for ( int i=0; i<interposedSyncs.size(); i++ ) {
+            if ( jtsTx == null ) { //ERROR 40
+                for ( int i=0; i<interposedSyncs.size(); i++ ) {//ERROR 15
                     try { 
                         Synchronization sync = (Synchronization)interposedSyncs.elementAt(i);
                         sync.afterCompletion(Status.STATUS_ROLLEDBACK);
@@ -47,16 +47,16 @@
                 }
 
                 // call afterCompletions
-                for ( int i=0; i<syncs.size(); i++ ) {
+                for ( int i=0; i<syncs.size(); i++ ) { //ERROR 15
                     try {
                         Synchronization sync = (Synchronization)syncs.elementAt(i);
                         sync.afterCompletion(Status.STATUS_ROLLEDBACK);
                     } catch ( Exception ex ) {
                         _logger.log(Level.WARNING, "enterprise_distributedtx.after_completion_excep", ex);
                     }
-
+//ERROR 12
                 }
-
+//ERROR 12
             }
             onTxCompletion(false);
             jtsTx = null;
